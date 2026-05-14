@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wolff AI - Universal</title>
+    <style>
+        :root {
+            --bg: #0d1117; --card: #161b22; --input: #010409;
+            --accent: #58a6ff; --text: #c9d1d9; --bot-msg: #21262d;
+            --user-msg: #1f6feb; --err: #f85149; --ok: #3fb950;
+        }
+        body { 
+            font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text);
+            margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh;
+        }
+        #chat-container { 
+            width: 95%; max-width: 700px; height: 90vh; background: var(--card);
+            border-radius: 16px; border: 1px solid #30363d; display: flex; flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6); animation: appear 0.5s ease;
+        }
+        @keyframes appear { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        #header { padding: 15px 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+        #status { font-size: 0.75rem; padding: 4px 10px; border-radius: 10px; background: #21262d; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .msg { padding: 12px 16px; border-radius: 15px; max-width: 85%; line-height: 1.5; animation: msgIn 0.3s ease; position: relative; }
+        @keyframes msgIn { from { opacity: 0; scale: 0.95; } to { opacity: 1; scale: 1; } }
+        .user { align-self: flex-end; background: var(--user-msg); color: white; border-bottom-right-radius: 2px; }
+        .bot { align-self: flex-start; background: var(--bot-msg); border: 1px solid #30363d; border-bottom-left-radius: 2px; }
+        .sys { align-self: center; font-size: 0.8rem; color: #8b949e; background: transparent; }
+        #preview { display: none; padding: 10px; gap: 10px; border-top: 1px solid #30363d; overflow-x: auto; }
+        .p-item { width: 50px; height: 50px; border-radius: 5px; background-size: cover; border: 1px solid var(--accent); }
+        #input-area { padding: 15px; background: var(--card); border-top: 1px solid #30363d; display: flex; gap: 10px; align-items: flex-end; }
+        #user-input { flex: 1; background: var(--input); border: 1px solid #30363d; color: white; padding: 12px; border-radius: 10px; outline: none; resize: none; max-height: 150px; }
+        .btn { background: #21262d; border: 1px solid #30363d; color: var(--accent); padding: 10px; border-radius: 10px; cursor: pointer; }
+        .btn:hover { background: #30363d; }
+        img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="header">
+        <strong>Wolff AI</strong>
+        <div id="status">Ожидание ключа...</div>
+    </div>
+    <div id="chat-box">
+        <div class="msg bot">Здравствуйте! Вставьте свой API ключ Google Gemini (начинается на AIza), чтобы начать работу. Я автоматически подберу лучшую модель. Вы можете добавить свой API ключ на сайте Google AI Studio.
+            Ваши API ключи сохраняются ТОЛЬКО в вашем браузере. Кроме вас их никто не увидит.
+        Также, если вы находитесь в СНГ, для работы ИИ модели вам нужно включить средство обхода блокировок.</div>
+    </div>
+    <div id="preview"></div>
+    <div id="input-area">
+        <button class="btn" onclick="document.getElementById('f').click()">📎</button>
+        <input type="file" id="f" hidden multiple onchange="hFiles(this.files)">
+        <textarea id="user-input" placeholder="Введите текст или ключ..." rows="1"></textarea>
+        <button class="btn" onclick="hSend()" style="font-weight:bold">➤</button>
+    </div>
+</div>
+
+<script>
+    let KEY = localStorage.getItem('wk') || '';
+    let MOD = localStorage.getItem('wm') || '';
+    let files = [];
+
+    if(KEY) { document.getElementById('status').innerText = MOD; document.getElementById('status').style.color = '#3fb950'; }
+
+    async function hFiles(fls) {
+        for(let f of fls) {
+            const r = new FileReader();
+            r.onload = (e) => {
+                files.push({t: f.type, d: e.target.result.split(',')[1], raw: e.target.result, img: f.type.startsWith('image/')});
+                renderP();
+            };
+            r.readAsDataURL(f);
+        }
+    }
+
+    function renderP() {
+        const p = document.getElementById('preview');
+        p.innerHTML = ''; p.style.display = files.length ? 'flex' : 'none';
+        files.forEach((f, i) => {
+            const d = document.createElement('div'); d.className = 'p-item';
+            if(f.img) d.style.backgroundImage = `url(${f.raw})`;
+            else d.innerHTML = '📄';
+            d.onclick = () => { files.splice(i, 1); renderP(); };
+            p.appendChild(d);
+        });
+    }
+
+    async function hSend() {
+        const inp = document.getElementById('user-input');
+        const txt = inp.value.trim();
+        if(!txt && !files.length) return;
+
+        if(!KEY) {
+            if(txt.startsWith('AIza')) {
+                addMsg("Проверяю ключ...", "sys");
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${txt}`);
+                const d = await res.json();
+                if(d.models) {
+                    KEY = txt; 
+                    MOD = d.models.find(m => m.name.includes('2.5-flash'))?.name || d.models[0].name;
+                    localStorage.setItem('wk', KEY); localStorage.setItem('wm', MOD);
+                    location.reload();
+                } else addMsg("Ошибка ключа!", "bot");
+            } else addMsg("Сначала введите ключ!", "bot");
+            return;
+        }
+
+        const curF = [...files]; files = []; renderP();
+        addMsg(txt, "user", null, curF);
+        inp.value = ''; inp.style.height = 'auto';
+
+        const tid = Date.now();
+        addMsg("...", "bot", tid);
+
+        try {
+            const parts = [{text: txt || "Опиши файлы"}];
+            curF.forEach(f => parts.push({inline_data: {mime_type: f.t, data: f.d}}));
+            const r = await fetch(`https://generativelanguage.googleapis.com/v1/${MOD}:generateContent?key=${KEY}`, {
+                method: 'POST', body: JSON.stringify({contents: [{parts}]})
+            });
+            const data = await r.json();
+            document.getElementById(tid).innerText = data.candidates[0].content.parts[0].text;
+        } catch(e) { document.getElementById(tid).innerText = "Ошибка: " + e.message; }
+    }
+
+    function addMsg(t, type, id, fls=[]) {
+        const d = document.createElement('div'); d.className = `msg ${type}`;
+        if(id) d.id = id; d.innerText = t;
+        fls.forEach(f => { if(f.img) { const i = new Image(); i.src = f.raw; d.appendChild(i); } });
+        document.getElementById('chat-box').appendChild(d);
+        document.getElementById('chat-box').scrollTop = 99999;
+    }
+
+    document.getElementById('user-input').oninput = function() { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; };
+</script>
+</body>
+</html>
