@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Wolff AI</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            --bg-color: #070a13;
+            --sphere-1: #38bdf8;
+            --sphere-2: #818cf8;
+            --card: rgba(22, 27, 34, 0.7); 
+            --input: rgba(1, 4, 9, 0.8);
+            --accent: #58a6ff; 
+            --text: #c9d1d9; 
+            --bot-msg: rgba(33, 38, 45, 0.75);
+            --user-msg: rgba(31, 111, 235, 0.85); 
+            --err: #f85149; 
+            --ok: #3fb950;
+        }
+        
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        html, body {
+            width: 100%; height: 100%; margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overflow: hidden;
+        }
+
+        body { 
+            background-image: radial-gradient(circle at top left, #111726, var(--bg-color));
+            color: var(--text); display: flex; justify-content: center; align-items: center; position: relative;
+        }
+
+        body::before, body::after {
+            content: ''; position: absolute; width: 320px; height: 320px;
+            filter: blur(120px); border-radius: 50%; z-index: -1; opacity: 0.3;
+        }
+        body::before { background: var(--sphere-1); top: 10%; left: 10%; animation: moveAround 12s infinite alternate ease-in-out; }
+        body::after { background: var(--sphere-2); bottom: 10%; right: 10%; animation: moveAround 18s infinite alternate-reverse ease-in-out; }
+
+        @keyframes moveAround { 
+            from { transform: translate(0,0) scale(1); } 
+            to { transform: translate(50px, 40px) scale(1.08); } 
+        }
+
+        #chat-container { 
+            width: 100%; height: 100vh; height: 100dvh; 
+            background: var(--card); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            display: flex; flex-direction: column; position: relative; overflow: hidden;
+        }
+
+        @media (min-width: 701px) {
+            #chat-container {
+                width: 95%; max-width: 500px; height: 85vh;
+                border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+            }
+        }
+
+        #header { 
+            height: 55px; padding: 0 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+            display: flex; justify-content: space-between; align-items: center;
+            flex-shrink: 0; background: rgba(0, 0, 0, 0.1);
+        }
+
+        #header strong {
+            font-size: 1.1rem; letter-spacing: 0.5px;
+            background: linear-gradient(45deg, #fff, var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .header-controls { display: flex; align-items: center; gap: 12px; }
+
+        #status { 
+            font-size: 0.75rem; padding: 4px 10px; border-radius: 10px; 
+            background: rgba(255,255,255,0.05); font-weight: 500;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+        }
+
+        .settings-btn {
+            background: transparent; border: none; color: white; font-size: 1.2rem;
+            cursor: pointer; padding: 4px; opacity: 0.8; transition: all 0.2s;
+        }
+        .settings-btn:hover { opacity: 1; transform: rotate(30deg); }
+
+        #chat-box { 
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; 
+            flex-direction: column; gap: 16px; scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .msg { 
+            padding: 12px 16px; border-radius: 16px; max-width: 85%; 
+            line-height: 1.5; font-size: 0.95rem; word-wrap: break-word;
+            white-space: pre-wrap; animation: msgIn 0.2s ease-out;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        @keyframes msgIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .user { align-self: flex-end; background: var(--user-msg); color: white; border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.08); }
+        .bot { align-self: flex-start; background: var(--bot-msg); border: 1px solid rgba(255, 255, 255, 0.04); border-bottom-left-radius: 4px; }
+
+        #input-area { 
+            padding: 15px 20px calc(15px + env(safe-area-inset-bottom)); 
+            background: rgba(7, 10, 19, 0.85); border-top: 1px solid rgba(255, 255, 255, 0.08); 
+            display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex-shrink: 0;
+        }
+
+        .input-row { display: flex; gap: 10px; align-items: center; }
+
+        #user-input { 
+            flex: 1; background: var(--input); border: 1px solid rgba(255, 255, 255, 0.08); 
+            color: white; padding: 12px; border-radius: 12px; outline: none; height: 44px;
+            font-size: 0.95rem; font-family: inherit; transition: border-color 0.2s;
+        }
+        #user-input:focus { border-color: var(--accent); }
+
+        .send-btn { 
+            background: var(--accent); color: #070a13; border: none; width: 44px; height: 44px;
+            border-radius: 12px; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 1.1rem; flex-shrink: 0; font-weight: bold; transition: all 0.2s;
+        }
+        .send-btn.stop-mode {
+            background: var(--err) !important;
+            color: white !important;
+        }
+
+        .attach-btn {
+            background: rgba(255, 255, 255, 0.05); color: white; border: 1px solid rgba(255, 255, 255, 0.08);
+            width: 44px; height: 44px; border-radius: 12px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; transition: background 0.2s;
+        }
+        .attach-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+        #file-preview-tag {
+            display: none; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 6px 12px; border-radius: 10px; font-size: 0.85rem; align-items: center; justify-content: space-between;
+        }
+
+        .modal-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(7, 10, 19, 0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            z-index: 100; justify-content: center; align-items: center;
+        }
+
+        .modal-content {
+            background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 92%; max-width: 450px; max-height: 90vh; overflow-y: auto; padding: 22px; border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6); position: relative;
+        }
+
+        .modal-overlay[style*="display: flex"] .modal-content,
+        .modal-overlay[style*="display: flex;"] .modal-content {
+            animation: modalFadeIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .settings-group { margin-bottom: 14px; position: relative; }
+        .settings-group label { display: block; font-size: 0.85rem; color: #8b949e; margin-bottom: 6px; font-weight: 600; }
+        
+        .settings-group input, .settings-group textarea {
+            width: 100%; padding: 10px 12px; background: rgba(1, 4, 9, 0.7); border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white; border-radius: 10px; outline: none; font-family: inherit; font-size: 0.9rem;
+        }
+        .settings-group input:focus, .settings-group textarea:focus { border-color: var(--accent); }
+
+        /* Стильные Кастомные Выпадающие Списки (Custom Select) */
+        .custom-select-wrapper { position: relative; width: 100%; user-select: none; }
+        .custom-select-trigger {
+            padding: 10px 12px; background: rgba(1, 4, 9, 0.7); border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white; border-radius: 10px; font-size: 0.9rem; cursor: pointer; display: flex;
+            justify-content: space-between; align-items: center; transition: all 0.2s;
+        }
+        .custom-select-trigger:after {
+            content: '▼'; font-size: 0.7rem; color: #8b949e; transition: transform 0.25s;
+        }
+        .custom-select-wrapper.open .custom-select-trigger { border-color: var(--accent); }
+        .custom-select-wrapper.open .custom-select-trigger:after { transform: rotate(180deg); color: var(--accent); }
+
+        .custom-options {
+            display: block; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+            background: rgba(22, 27, 34, 0.98); border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px; z-index: 105; max-height: 200px; overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0; visibility: hidden;
+            transform: translateY(-10px); transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+        }
+        .custom-select-wrapper.open .custom-options { opacity: 1; visibility: visible; transform: translateY(0); }
+
+        .custom-option {
+            padding: 10px 12px; font-size: 0.9rem; color: #c9d1d9; cursor: pointer; transition: all 0.15s;
+        }
+        .custom-option:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+        .custom-option.selected { background: rgba(88, 166, 255, 0.15); color: var(--accent); font-weight: bold; }
+
+        .modal-alert {
+            display: none; background: rgba(248, 81, 73, 0.15); border: 1px solid var(--err);
+            color: #ff7b72; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 14px; line-height: 1.4;
+            animation: alertFadeIn 0.25s ease-out forwards;
+        }
+        @keyframes alertFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .provider-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+        .provider-tab {
+            padding: 8px 4px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px; cursor: pointer; text-align: center; font-size: 0.75rem; font-weight: 600; color: #8b949e; transition: all 0.2s;
+        }
+        .provider-tab.active { background: rgba(255,255,255,0.08); border-color: var(--accent); color: #fff; }
+
+        .theme-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+        .theme-item {
+            padding: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px; cursor: pointer; text-align: center; font-size: 0.8rem; color: #8b949e; transition: all 0.2s;
+        }
+        .theme-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+        .theme-item.active { border-color: var(--accent); background: rgba(255, 255, 255, 0.08); color: #fff; font-weight: bold; }
+
+        #theme-preview-box {
+            width: 100%; height: 65px; border-radius: 12px; margin-top: 6px; border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+        }
+        .preview-sphere { position: absolute; width: 35px; height: 35px; filter: blur(12px); border-radius: 50%; opacity: 0.5; }
+        .preview-bubble { padding: 6px 10px; border-radius: 8px; font-size: 0.7rem; z-index: 2; font-weight: 500; }
+
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-save { background: var(--accent); color: #070a13; border: none; padding: 12px; border-radius: 10px; font-weight: bold; flex: 1; cursor: pointer; }
+        .btn-clear { background: var(--err); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+
+        .guide-box {
+            background: rgba(0, 162, 255, 0.08); border: 1px solid rgba(88, 166, 255, 0.3);
+            border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.85rem; line-height: 1.45; color: #abecff;
+            animation: guideFade 0.25s ease-out;
+        }
+        @keyframes guideFade { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .guide-box ol { margin: 6px 0 0 18px; padding: 0; }
+        .guide-box li { margin-bottom: 4px; color: #c9d1d9; }
+        .guide-link { color: var(--accent); text-decoration: none; font-weight: bold; }
+        .guide-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="header">
+        <strong>Wolff AI</strong>
+        <div class="header-controls">
+            <div id="status">Загрузка...</div>
+            <button class="settings-btn" onclick="toggleSettings(true)">⚙️</button>
+        </div>
+    </div>
+    
+    <div id="chat-box"></div>
+    
+    <div id="input-area">
+        <div id="file-preview-tag">
+            <span id="file-preview-name" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 80%;"></span>
+            <button onclick="clearSelectedFile()" style="background:transparent; border:none; color:var(--err); cursor:pointer; font-weight:bold; font-size:1.1rem; line-height:1;">&times;</button>
+        </div>
+        <div class="input-row">
+            <button class="attach-btn" id="attach-file-btn" onclick="document.getElementById('file-input').click()">📎</button>
+            <input type="file" id="file-input" style="display:none;" onchange="handleFileSelect(this)">
+            <input type="text" id="user-input" placeholder="Введите сообщение...">
+            <button class="send-btn" id="action-btn" onclick="handleSendOrStop()">➤</button>
+        </div>
+    </div>
+
+    <div id="welcome-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top:0; margin-bottom:4px; font-size:1.2rem; text-align:center; color:#fff;">Добро пожаловать в Wolff AI!</h3>
+            <p style="font-size:0.8rem; color:#8b949e; text-align:center; margin-bottom:12px; margin-top:0;">Выберите AI-платформу и добавьте ваш секретный ключ.</p>
+            
+            <div id="welcome-error-alert" class="modal-alert">
+                ⚠️ <b>Ошибка доступа:</b> Пожалуйста, введите корректный API-ключ выбранного провайдера.
+            </div>
+
+            <div class="provider-tabs">
+                <div class="provider-tab active" id="tab-welcome-gemini" onclick="switchWelcomeProvider('gemini')">Gemini</div>
+                <div class="provider-tab" id="tab-welcome-openai" onclick="switchWelcomeProvider('openai')">OpenAI</div>
+                <div class="provider-tab" id="tab-welcome-deepseek" onclick="switchWelcomeProvider('deepseek')">DeepSeek</div>
+                <div class="provider-tab" id="tab-welcome-claude" onclick="switchWelcomeProvider('claude')">Claude</div>
+                <div class="provider-tab" id="tab-welcome-grok" onclick="switchWelcomeProvider('grok')">Grok</div>
+                <div class="provider-tab" id="tab-welcome-openrouter" onclick="switchWelcomeProvider('openrouter')">Router</div>
+            </div>
+
+            <div class="guide-box" id="welcome-guide-content"></div>
+
+            <div class="settings-group">
+                <label id="welcome-key-label">Вставьте API Ключ:</label>
+                <input type="password" id="welcome-key" placeholder="">
+            </div>
+
+            <div class="modal-buttons" style="margin-top: 16px;">
+                <button class="btn-save" onclick="saveWelcomeKey()">Начать работу</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px;">
+                <h3 style="margin: 0; font-size: 1.1rem; letter-spacing: 0.5px;">⚙️ Настройки</h3>
+                <button onclick="toggleSettings(false)" style="background:transparent; border:none; color:var(--err); font-size:1.4rem; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+
+            <div class="settings-group">
+                <label>Выбор темы оформления:</label>
+                <div class="theme-grid">
+                    <div class="theme-item" id="btn-space" onclick="selectTheme('space')">Космос</div>
+                    <div class="theme-item" id="btn-cyberpunk" onclick="selectTheme('cyberpunk')">Киберпанк</div>
+                    <div class="theme-item" id="btn-matrix" onclick="selectTheme('matrix')">Матрица</div>
+                    <div class="theme-item" id="btn-amethyst" onclick="selectTheme('amethyst')">Аметист</div>
+                    <div class="theme-item" id="btn-sunset" onclick="selectTheme('sunset')">Закат</div>
+                    <div class="theme-item" id="btn-emerald" onclick="selectTheme('emerald')">Изумруд</div>
+                    <div class="theme-item" id="btn-ruby" onclick="selectTheme('ruby')">Рубин</div>
+                    <div class="theme-item" id="btn-aurora" onclick="selectTheme('aurora')">Аврора</div>
+                </div>
+                <div id="theme-preview-box">
+                    <div class="preview-sphere" id="prev-sp1" style="left: 10%; top: 10%;"></div>
+                    <div class="preview-sphere" id="prev-sp2" style="right: 10%; bottom: 10%;"></div>
+                    <div class="preview-bubble" style="background: rgba(33, 38, 45, 0.75); color: #c9d1d9; border: 1px solid rgba(255,255,255,0.04);">Бот</div>
+                    <div class="preview-bubble" id="prev-user-bubble" style="color: white;">Вы</div>
+                </div>
+            </div>
+
+            <div class="settings-group" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:12px; z-index: 110;">
+                <label>Текущий активный ИИ-провайдер:</label>
+                <div class="custom-select-wrapper" id="provider-select-wrapper">
+                    <div class="custom-select-trigger" onclick="toggleCustomSelect('provider-select-wrapper')">Выбрать провайдера</div>
+                    <div class="custom-options" id="provider-custom-options"></div>
+                </div>
+            </div>
+
+            <div id="setting-guide-box" class="guide-box" style="display: none;"></div>
+
+            <div class="settings-group">
+                <label id="setting-key-label">API Ключ для выбранного провайдера:</label>
+                <input type="password" id="setting-key" placeholder="Введите ключ...">
+            </div>
+            
+            <div class="settings-group" style="z-index: 109;">
+                <label>Модель нейросети:</label>
+                <div class="custom-select-wrapper" id="model-select-wrapper">
+                    <div class="custom-select-trigger" onclick="toggleCustomSelect('model-select-wrapper')">Выбрать модель</div>
+                    <div class="custom-options" id="model-custom-options"></div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <label>Характер ИИ / Системный промпт:</label>
+                <textarea id="setting-prompt" rows="2" placeholder="Например: Отвечай кратко..."></textarea>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-save" onclick="saveSettings()">Сохранить</button>
+                <button class="btn-clear" onclick="clearChat()">Очистить чат</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const themes = {
+        space: { bg: '#070a13', s1: '#38bdf8', s2: '#818cf8', accent: '#58a6ff', userMsg: 'rgba(31, 111, 235, 0.85)' },
+        cyberpunk: { bg: '#0a000f', s1: '#ff007f', s2: '#00f0ff', accent: '#ff007f', userMsg: 'rgba(255, 0, 127, 0.8)' },
+        matrix: { bg: '#020a05', s1: '#00ff66', s2: '#003311', accent: '#2ea44f', userMsg: 'rgba(46, 164, 79, 0.8)' },
+        amethyst: { bg: '#0b0514', s1: '#a855f7', s2: '#ec4899', accent: '#a855f7', userMsg: 'rgba(168, 85, 247, 0.8)' },
+        sunset: { bg: '#140705', s1: '#f97316', s2: '#ef4444', accent: '#f97316', userMsg: 'rgba(239, 68, 68, 0.85)' },
+        emerald: { bg: '#040d0a', s1: '#10b981', s2: '#059669', accent: '#34d399', userMsg: 'rgba(5, 150, 105, 0.85)' },
+        ruby: { bg: '#120408', s1: '#ef4444', s2: '#991b1b', accent: '#f87171', userMsg: 'rgba(185, 28, 28, 0.85)' },
+        aurora: { bg: '#030f0e', s1: '#2dd4bf', s2: '#0ea5e9', accent: '#2dd4bf', userMsg: 'rgba(13, 148, 136, 0.85)' }
+    };
+
+    const providerMeta = {
+        gemini: {
+            name: "Google Gemini", placeholder: "AIzaSy...",
+            models: [
+                { value: "gemini-2.5-flash", name: "Gemini 2.5 Flash (Рекомендуемая)" },
+                { value: "gemini-2.5-pro", name: "Gemini 2.5 Pro (Высокая точность)" }
+            ],
+            guide: `ℹ️ <b>У вас не привязан ключ Google Gemini!</b> Чтобы исправить это:<ol><li>Перейдите на бесплатную платформу <a href="https://aistudio.google.com/" target="_blank" class="guide-link">Google AI Studio</a>.</li><li>Нажмите кнопку <b>"Get API key"</b>.</li><li>Создайте токен, скопируйте его и вставьте в поле ниже.</li></ol>`
+        },
+        openai: {
+            name: "OpenAI ChatGPT", placeholder: "sk-proj-...",
+            models: [
+                { value: "gpt-4o-mini", name: "GPT-4o Mini (Быстрая и экономная)" },
+                { value: "gpt-4o", name: "GPT-4o (Флагман интеллект)" }
+            ],
+            guide: `ℹ️ <b>У вас нет ключа для OpenAI!</b> Инструкция по получению:<ol><li>Зайдите в личный кабинет <a href="https://platform.openai.com/" target="_blank" class="guide-link">OpenAI Platform</a>.</li><li>Перейдите во вкладку <b>API Keys</b>.</li><li>Нажмите <b>"Create new secret key"</b> и сохраните созданный ключ сюда.</li></ol>`
+        },
+        deepseek: {
+            name: "DeepSeek AI", placeholder: "sk-...",
+            models: [
+                { value: "deepseek-chat", name: "DeepSeek-V3 (Диалоги и тексты)" },
+                { value: "deepseek-reasoner", name: "DeepSeek-R1 (Глубокие рассуждения)" }
+            ],
+            guide: `ℹ️ <b>Ключ DeepSeek не обнаружен.</b> Как его сделать самостоятельно:<ol><li>Зарегистрируйтесь/войдите на <a href="https://platform.deepseek.com/" target="_blank" class="guide-link">DeepSeek Platform</a>.</li><li>Откройте меню настроек <b>API Keys</b>.</li><li>Нажмите кнопку генерации нового токена.</li></ol>`
+        },
+        claude: {
+            name: "Anthropic Claude", placeholder: "sk-ant-...",
+            models: [
+                { value: "claude-3-5-sonnet-latest", name: "Claude 3.5 Sonnet (Лучшая для кода)" },
+                { value: "claude-3-5-haiku-latest", name: "Claude 3.5 Haiku (Молниеносная)" }
+            ],
+            guide: `ℹ️ <b>Ключ Anthropic Claude не настроен.</b> Шаги для активации:<ol><li>Посетите панель управления <a href="https://console.anthropic.com/" target="_blank" class="guide-link">Anthropic Console</a>.</li><li>В верхнем меню кликните по вкладке <b>"Get API Keys"</b>.</li><li>Выпустите секретный токен для работы.</li></ol>`
+        },
+        grok: {
+            name: "xAI Grok", placeholder: "xai-...",
+            models: [
+                { value: "grok-2-1212", name: "Grok 2 (Модель Илона Маска)" }
+            ],
+            guide: `ℹ️ <b>Ключ xAI Grok отсутствует.</b> Процедура привязки:<ol><li>Перейдите в консоль Илона Маска <a href="https://console.x.ai/" target="_blank" class="guide-link">xAI Console</a>.</li><li>Пройдите авторизацию через аккаунт социальной сети X.</li><li>Создайте рабочий токен внутри раздела <b>API Keys</b>.</li></ol>`
+        },
+        openrouter: {
+            name: "OpenRouter Hub", placeholder: "sk-or-...",
+            models: [
+                { value: "meta-llama/llama-3.1-70b-instruct", name: "Llama 3.1 70B (Meta)" },
+                { value: "qwen/qwen-2.5-72b-instruct", name: "Qwen 2.5 72B (Alibaba)" }
+            ],
+            guide: `ℹ️ <b>Вы не настроили агрегатор OpenRouter!</b> Как открыть доступ ко всем ИИ сразу:<ol><li>Перейдите на единый ИИ-хаб <a href="https://openrouter.ai/" target="_blank" class="guide-link">OpenRouter</a>.</li><li>В настройках профиля найдите раздел <b>Keys</b>.</li><li>Сгенерируйте один ключ для сотен open-source сетей.</li></ol>`
+        }
+    };
+
+    let CURRENT_PROVIDER = localStorage.getItem('wolff_provider') || 'gemini';
+    let ACTIVE_MODEL = localStorage.getItem('wolff_model') || 'gemini-2.5-flash';
+    let SYSTEM_PROMPT = localStorage.getItem('wolff_prompt') || '';
+    let ACTIVE_THEME = localStorage.getItem('wolff_theme') || 'space';
+    let WELCOME_SELECTED_PROVIDER = 'gemini';
+
+    let attachedFileData = null; let attachedFileMime = null; let attachedFileName = null; let attachedFileAsText = null; let isImageFile = false;
+    let isGenerating = false; let currentAbortController = null;
+
+    // Внутреннее хранилище значений кастомных селектов
+    let selectedProviderValue = CURRENT_PROVIDER;
+    let selectedModelValue = ACTIVE_MODEL;
+
+    const WELCOME_BOT_TEXT = `Здравствуйте! Выберите ИИ-провайдера, вставьте ваш API-ключ, чтобы начать работу.
+Все ключи сохраняются исключительно локально в вашем браузере. Вы можете свободно прикреплять фотографии и текстовые файлы (.txt, .js, .py и др.) к любой модели — приложение автоматически преобразует их для обработки искусственным интеллектом!`;
+
+    window.onload = () => {
+        let currentKey = localStorage.getItem(`wolff_key_${CURRENT_PROVIDER}`);
+        if (!currentKey) {
+            const alternative = Object.keys(providerMeta).find(p => localStorage.getItem(`wolff_key_${p}`));
+            if (alternative) {
+                CURRENT_PROVIDER = alternative;
+                currentKey = localStorage.getItem(`wolff_key_${alternative}`);
+                ACTIVE_MODEL = providerMeta[CURRENT_PROVIDER].models[0].value;
+                localStorage.setItem('wolff_provider', CURRENT_PROVIDER);
+                localStorage.setItem('wolff_model', ACTIVE_MODEL);
+            }
+        }
+
+        if (!currentKey) {
+            document.getElementById('welcome-modal').style.display = 'flex';
+            switchWelcomeProvider('gemini');
+            document.getElementById('chat-box').innerHTML = '';
+        } else {
+            document.getElementById('welcome-modal').style.display = 'none';
+            document.getElementById('chat-box').innerHTML = `<div class="msg bot">${WELCOME_BOT_TEXT}</div>`;
+        }
+
+        selectedProviderValue = CURRENT_PROVIDER;
+        selectedModelValue = ACTIVE_MODEL;
+        
+        buildCustomProviderOptions();
+        updateCustomModelDropdown(CURRENT_PROVIDER, ACTIVE_MODEL);
+        
+        document.getElementById('setting-key').value = currentKey || '';
+        document.getElementById('setting-prompt').value = SYSTEM_PROMPT;
+        
+        applyTheme(ACTIVE_THEME);
+        selectTheme(ACTIVE_THEME); 
+        updateStatus();
+
+        // Закрытие списков при клике в любое другое место
+        window.addEventListener('click', function(e) {
+            if (!e.target.closest('.custom-select-wrapper')) {
+                document.querySelectorAll('.custom-select-wrapper').forEach(el => el.classList.remove('open'));
+            }
+        });
+    };
+
+    // Логика работы кастомных селектов
+    function toggleCustomSelect(id) {
+        const wrapper = document.getElementById(id);
+        const isOpen = wrapper.classList.contains('open');
+        document.querySelectorAll('.custom-select-wrapper').forEach(el => el.classList.remove('open'));
+        if (!isOpen) wrapper.classList.add('open');
+    }
+
+    function buildCustomProviderOptions() {
+        const container = document.getElementById('provider-custom-options');
+        container.innerHTML = '';
+        Object.keys(providerMeta).forEach(key => {
+            const opt = document.createElement('div');
+            opt.className = 'custom-option' + (key === selectedProviderValue ? ' selected' : '');
+            opt.innerText = providerMeta[key].name;
+            opt.onclick = function() {
+                selectCustomProvider(key);
+            };
+            container.appendChild(opt);
+        });
+        document.querySelector('#provider-select-wrapper .custom-select-trigger').innerText = providerMeta[selectedProviderValue].name;
+    }
+
+    function selectCustomProvider(val) {
+        selectedProviderValue = val;
+        document.getElementById('provider-select-wrapper').classList.remove('open');
+        buildCustomProviderOptions();
+        
+        const keyInput = document.getElementById('setting-key');
+        const guideBox = document.getElementById('setting-guide-box');
+        const savedKey = localStorage.getItem(`wolff_key_${val}`) || '';
+        
+        keyInput.value = savedKey;
+        keyInput.placeholder = providerMeta[val].placeholder;
+        document.getElementById('setting-key-label').innerText = `API Ключ для ${providerMeta[val].name}:`;
+        
+        const firstModel = providerMeta[val].models[0].value;
+        updateCustomModelDropdown(val, firstModel);
+
+        if (!savedKey) {
+            guideBox.innerHTML = providerMeta[val].guide;
+            guideBox.style.display = 'block';
+        } else {
+            guideBox.style.display = 'none';
+        }
+    }
+
+    function updateCustomModelDropdown(provider, currentValue) {
+        selectedModelValue = currentValue;
+        const container = document.getElementById('model-custom-options');
+        container.innerHTML = '';
+        
+        const models = providerMeta[provider].models;
+        let currentName = "";
+
+        models.forEach(m => {
+            const opt = document.createElement('div');
+            opt.className = 'custom-option' + (m.value === currentValue ? ' selected' : '');
+            opt.innerText = m.name;
+            if (m.value === currentValue) currentName = m.name;
+            
+            opt.onclick = function() {
+                selectedModelValue = m.value;
+                document.getElementById('model-select-wrapper').classList.remove('open');
+                updateCustomModelDropdown(provider, m.value);
+            };
+            container.appendChild(opt);
+        });
+        document.querySelector('#model-select-wrapper .custom-select-trigger').innerText = currentName || "Выбрать модель";
+    }
+
+    function switchWelcomeProvider(provider) {
+        WELCOME_SELECTED_PROVIDER = provider;
+        document.querySelectorAll('#welcome-modal .provider-tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-welcome-${provider}`).classList.add('active');
+        
+        const meta = providerMeta[provider];
+        document.getElementById('welcome-guide-content').innerHTML = meta.guide.replace("ℹ️ <b>У вас не привязан ключ", "💡 <b>Инструкция для").replace("ℹ️ <b>У вас нет ключа для", "💡 <b>Инструкция для").replace("ℹ️ <b>Ключ", "💡 <b>Инструкция для").replace("не обнаружен.", "").replace("не настроен.", "").replace("отсутствует.", "").replace("вы не настроили агрегатор", "Инструкция для");
+        document.getElementById('welcome-key-label').innerText = `API Ключ для ${meta.name}:`;
+        
+        const input = document.getElementById('welcome-key');
+        input.placeholder = meta.placeholder;
+        input.value = localStorage.getItem(`wolff_key_${provider}`) || '';
+    }
+
+    function saveWelcomeKey() {
+        const inputKey = document.getElementById('welcome-key').value.trim();
+        if (!inputKey) {
+            document.getElementById('welcome-error-alert').style.display = 'block';
+            return;
+        }
+        document.getElementById('welcome-error-alert').style.display = 'none';
+        
+        CURRENT_PROVIDER = WELCOME_SELECTED_PROVIDER;
+        ACTIVE_MODEL = providerMeta[CURRENT_PROVIDER].models[0].value;
+        
+        localStorage.setItem('wolff_provider', CURRENT_PROVIDER);
+        localStorage.setItem(`wolff_key_${CURRENT_PROVIDER}`, inputKey);
+        localStorage.setItem('wolff_model', ACTIVE_MODEL);
+
+        selectedProviderValue = CURRENT_PROVIDER;
+        selectedModelValue = ACTIVE_MODEL;
+        buildCustomProviderOptions();
+        updateCustomModelDropdown(CURRENT_PROVIDER, ACTIVE_MODEL);
+        document.getElementById('setting-key').value = inputKey;
+        
+        document.getElementById('welcome-modal').style.display = 'none';
+        updateStatus();
+        document.getElementById('chat-box').innerHTML = `<div class="msg bot">${WELCOME_BOT_TEXT}</div>`;
+    }
+
+    function updateStatus() {
+        const statusElement = document.getElementById('status');
+        const key = localStorage.getItem(`wolff_key_${CURRENT_PROVIDER}`);
+        if (!key) {
+            statusElement.innerText = 'Ключ не задан ⚙️';
+            statusElement.style.color = '#f85149';
+        } else {
+            statusElement.innerText = `${CURRENT_PROVIDER.toUpperCase()}: ${ACTIVE_MODEL.split('/').pop()}`;
+            statusElement.style.color = '#3fb950';
+        }
+    }
+
+    function applyTheme(themeName) {
+        const t = themes[themeName] || themes.space;
+        const root = document.documentElement;
+        root.style.setProperty('--bg-color', t.bg);
+        root.style.setProperty('--sphere-1', t.s1);
+        root.style.setProperty('--sphere-2', t.s2);
+        root.style.setProperty('--accent', t.accent);
+        root.style.setProperty('--user-msg', t.userMsg);
+    }
+
+    function selectTheme(themeName) {
+        ACTIVE_THEME = themeName;
+        const t = themes[themeName] || themes.space;
+        document.querySelectorAll('.theme-item').forEach(el => el.classList.remove('active'));
+        const activeBtn = document.getElementById(`btn-${themeName}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        const previewBox = document.getElementById('theme-preview-box');
+        if (previewBox) {
+            previewBox.style.backgroundColor = t.bg;
+            document.getElementById('prev-sp1').style.background = t.s1;
+            document.getElementById('prev-sp2').style.background = t.s2;
+            document.getElementById('prev-user-bubble').style.background = t.userMsg;
+        }
+    }
+
+    function toggleSettings(show) {
+        if (show) {
+            selectTheme(ACTIVE_THEME);
+            selectedProviderValue = CURRENT_PROVIDER;
+            selectedModelValue = ACTIVE_MODEL;
+            buildCustomProviderOptions();
+            selectCustomProvider(CURRENT_PROVIDER);
+            updateCustomModelDropdown(CURRENT_PROVIDER, ACTIVE_MODEL);
+            document.getElementById('setting-prompt').value = SYSTEM_PROMPT;
+        }
+        document.getElementById('settings-modal').style.display = show ? 'flex' : 'none';
+    }
+
+    function saveSettings() {
+        const prov = selectedProviderValue;
+        const key = document.getElementById('setting-key').value.trim();
+        ACTIVE_MODEL = selectedModelValue;
+        SYSTEM_PROMPT = document.getElementById('setting-prompt').value.trim();
+
+        if (!key) {
+            alert(`Пожалуйста, заполните API-ключ для работы с платформой ${providerMeta[prov].name}!`);
+            return;
+        }
+
+        CURRENT_PROVIDER = prov;
+        localStorage.setItem('wolff_provider', CURRENT_PROVIDER);
+        localStorage.setItem(`wolff_key_${CURRENT_PROVIDER}`, key);
+        localStorage.setItem('wolff_model', ACTIVE_MODEL);
+        localStorage.setItem('wolff_prompt', SYSTEM_PROMPT);
+        localStorage.setItem('wolff_theme', ACTIVE_THEME);
+
+        applyTheme(ACTIVE_THEME); updateStatus(); toggleSettings(false);
+        addMessage(`Успешно переключено на: ${providerMeta[CURRENT_PROVIDER].name}`, "bot");
+    }
+
+    function clearChat() {
+        document.getElementById('chat-box').innerHTML = `<div class="msg bot">${WELCOME_BOT_TEXT}</div>`;
+        toggleSettings(false);
+    }
+
+    function handleFileSelect(input) {
+        const file = input.files[0]; if (!file) return;
+        if (file.size > 20 * 1024 * 1024) { alert("Файл слишком большой! Ограничение — 20 МБ."); input.value = ''; return; }
+        
+        attachedFileName = file.name; attachedFileMime = file.type;
+        isImageFile = file.type.startsWith('image/');
+        attachedFileAsText = null; attachedFileData = null;
+
+        const reader = new FileReader();
+        if (isImageFile) {
+            reader.onload = function(e) {
+                attachedFileData = e.target.result.split(',')[1];
+                showFileTag();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            reader.onload = function(e) {
+                attachedFileAsText = e.target.result;
+                showFileTag();
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    function showFileTag() {
+        document.getElementById('file-preview-tag').style.setProperty('display', 'flex', 'important');
+        document.getElementById('file-preview-name').innerText = `📎 [Файл загружен] ${attachedFileName}`;
+    }
+
+    function clearSelectedFile() {
+        attachedFileData = null; attachedFileMime = null; attachedFileName = null; attachedFileAsText = null; isImageFile = false;
+        if(document.getElementById('file-input')) document.getElementById('file-input').value = '';
+        if(document.getElementById('file-preview-tag')) document.getElementById('file-preview-tag').style.display = 'none';
+    }
+
+    function addMessage(text, type, id = null) {
+        const box = document.getElementById('chat-box');
+        const d = document.createElement('div'); d.className = `msg ${type}`;
+        if (id) d.id = id; d.innerText = text;
+        box.appendChild(d); box.scrollTop = box.scrollHeight;
+    }
+
+    function handleSendOrStop() {
+        if (isGenerating) { stopGeneration(); } else { handleSend(); }
+    }
+
+    function stopGeneration() {
+        if (currentAbortController) { currentAbortController.abort(); }
+    }
+
+    function setButtonMode(stopMode) {
+        const btn = document.getElementById('action-btn');
+        isGenerating = stopMode;
+        if (stopMode) {
+            btn.innerText = '■';
+            btn.classList.add('stop-mode');
+        } else {
+            btn.innerText = '➤';
+            btn.classList.remove('stop-mode');
+        }
+    }
+
+    async function handleSend() {
+        const inputElement = document.getElementById('user-input');
+        let text = inputElement.value.trim();
+        if (!text && !attachedFileData && !attachedFileAsText) return;
+
+        const activeKey = localStorage.getItem(`wolff_key_${CURRENT_PROVIDER}`);
+        if (!activeKey) {
+            addMessage(`Ошибка: Не задан API-ключ для ${providerMeta[CURRENT_PROVIDER].name}. Перейдите в настройки ⚙️`, "bot");
+            return;
+        }
+
+        let displayText = text;
+        if (attachedFileName) displayText = text ? `${text}\n[Файл: ${attachedFileName}]` : `[Файл: ${attachedFileName}]`;
+        addMessage(displayText, "user"); 
+        inputElement.value = '';
+
+        if (attachedFileName && !isImageFile && attachedFileAsText) {
+            text = `${text}\n\n[Системное вложение: Содержимое файла "${attachedFileName}"]\n${attachedFileAsText}`;
+        }
+
+        const botMsgId = 'bot-' + Date.now(); 
+        addMessage('Думаю...', "bot", botMsgId);
+
+        const fileData = attachedFileData; const fileMime = attachedFileMime; const wasImage = isImageFile;
+        clearSelectedFile();
+
+        setButtonMode(true);
+        currentAbortController = new AbortController();
+        const signal = currentAbortController.signal;
+
+        try {
+            let apiResponse;
+            
+            if (CURRENT_PROVIDER === 'gemini') {
+                const parts = [];
+                if (text) parts.push({ text: text });
+                if (wasImage && fileData) parts.push({ inlineData: { mimeType: fileMime, data: fileData } });
+                if (parts.length === 0) parts.push({ text: "Посмотри на вложение" });
+
+                const requestBody = { contents: [{ parts: parts }] };
+                if (SYSTEM_PROMPT) requestBody.systemInstruction = { parts: [{ text: SYSTEM_PROMPT }] };
+
+                apiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models/${ACTIVE_MODEL}:generateContent?key=${activeKey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody), signal: signal
+                });
+                const resultJson = await apiResponse.json();
+                if (resultJson.error) throw new Error(resultJson.error.message);
+                document.getElementById(botMsgId).innerText = resultJson.candidates[0].content.parts[0].text;
+
+            } else if (CURRENT_PROVIDER === 'claude') {
+                let endpoint = "https://api.anthropic.com/v1/messages";
+                let headers = {
+                    'Content-Type': 'application/json', 'x-api-key': activeKey,
+                    'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'
+                };
+
+                let contentArray = [];
+                if (wasImage && fileData) {
+                    contentArray.push({ type: "image", source: { type: "base64", media_type: fileMime, data: fileData } });
+                }
+                contentArray.push({ type: "text", text: text || "Посмотри на изображение" });
+
+                const body = { model: ACTIVE_MODEL, max_tokens: 4096, messages: [{ role: "user", content: contentArray }] };
+                if (SYSTEM_PROMPT) body.system = SYSTEM_PROMPT;
+
+                apiResponse = await fetch(endpoint, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: signal });
+                const resultJson = await apiResponse.json();
+                if (resultJson.error) throw new Error(resultJson.error.message);
+                document.getElementById(botMsgId).innerText = resultJson.content[0].text;
+
+            } else {
+                let endpoint = ""; 
+                let headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeKey}` };
+                
+                if (CURRENT_PROVIDER === 'openai') endpoint = "https://api.openai.com/v1/chat/completions";
+                else if (CURRENT_PROVIDER === 'deepseek') endpoint = "https://api.deepseek.com/v1/chat/completions";
+                else if (CURRENT_PROVIDER === 'grok') endpoint = "https://api.x.ai/v1/chat/completions";
+                else if (CURRENT_PROVIDER === 'openrouter') endpoint = "https://openrouter.ai/api/v1/chat/completions";
+
+                let userContent = [];
+                if (wasImage && fileData) {
+                    userContent.push({ type: "image_url", image_url: { url: `data:${fileMime};base64,${fileData}` } });
+                }
+                userContent.push({ type: "text", text: text || "Посмотри на картинку" });
+
+                const messages = [];
+                if (SYSTEM_PROMPT) messages.push({ role: "system", content: SYSTEM_PROMPT });
+                messages.push({ role: "user", content: userContent });
+
+                apiResponse = await fetch(endpoint, {
+                    method: 'POST', headers: headers,
+                    body: JSON.stringify({ model: ACTIVE_MODEL, messages: messages }), signal: signal
+                });
+                const resultJson = await apiResponse.json();
+                if (resultJson.error) throw new Error(resultJson.error.message);
+                document.getElementById(botMsgId).innerText = resultJson.choices[0].message.content;
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                document.getElementById(botMsgId).innerHTML = `<i style="color:#8b949e">Ответ остановлен пользователем.</i>`;
+            } else {
+                document.getElementById(botMsgId).innerHTML = `<b style="color:#f85149">Ошибка обработки: ${error.message}</b>`;
+            }
+        } finally {
+            setButtonMode(false); currentAbortController = null;
+        }
+        setTimeout(() => { document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight; }, 30);
+    }
+
+    document.getElementById('user-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); handleSendOrStop(); }
+    });
+</script>
+</body>
+</html>
