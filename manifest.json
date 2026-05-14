@@ -1,7 +1,8 @@
 {
   "name": "Wolff AI Chat",
   "short_name": "Wolff AI",
-  "start_url": "index.html",
+  "start_url": "./index.html",
+  "id": "com.wolffai.chat",
   "display": "standalone",
   "background_color": "#070a13",
   "theme_color": "#070a13",
@@ -9,15 +10,9 @@
   "icons": [
     {
       "src": "logo.webp",
-      "sizes": "192x192",
+      "sizes": "192x192 512x512",
       "type": "image/webp",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "logo.webp",
-      "sizes": "512x512",
-      "type": "image/webp",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
